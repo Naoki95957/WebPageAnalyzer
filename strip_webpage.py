@@ -3,28 +3,16 @@ import nltk
 import selenium
 import unicodedata
 import re
+import spacy
 import platform
+from bs4 import BeautifulSoup
 from pathlib import Path
+from bs4.element import Comment
 from selenium.webdriver.chrome.options import Options
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.corpus import stopwords
 from io import StringIO
 from html.parser import HTMLParser
-
-class MLStripper(HTMLParser):
-
-    def __init__(self):
-        super().__init__()
-        self.reset()
-        self.strict = False
-        self.convert_charrefs= True
-        self.text = StringIO()
-
-    def handle_data(self, d):
-        self.text.write(d)
-
-    def get_data(self):
-        return self.text.getvalue()
 
 class WebPageVectorizer():
     """
@@ -75,12 +63,37 @@ class WebPageVectorizer():
         """
         return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8', 'ignore')
 
-    def print_key_words(self):
+    @staticmethod
+    def tag_visible(element):
+        if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
+            return False
+        if isinstance(element, Comment):
+            return False
+        return True
+
+    @staticmethod
+    def text_from_html(text: str):
         """
-        will both print and return a list of keywords in order of frequency 
+        Strips text off html
+
+        This is taken from here: 
+        https://stackoverflow.com/questions/1936466/beautifulsoup-grab-visible-webpage-text
         """
+        soup = BeautifulSoup(text, 'html.parser')
+        texts = soup.findAll(text=True)
+        visible_texts = filter(WebPageVectorizer.tag_visible, texts)  
+        return u" ".join(t.strip() for t in visible_texts)
+
+    def print_freq_words(self, text=''):
+        """
+        Will both print and return a list of words in order of frequency
+
+        Set text to adjust with a param., default is all text
+        """
+        if not bool (text):
+            text = self.working_dictionary
         vectorizer = CountVectorizer(stop_words=self.custom_stopwords)
-        matrix = vectorizer.fit_transform([self.working_dictionary])
+        matrix = vectorizer.fit_transform([text])
         df = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names()).T
         sorted_words = df.sort_values(by=[0], ascending=False)
         for i in range(0, len(sorted_words)):
@@ -95,12 +108,16 @@ class WebPageVectorizer():
         returns a string
         """
         self.driver.get(url)
-        stripper = MLStripper()
-        stripper.feed(self.driver.page_source)
-        text = stripper.get_data()
+        text = WebPageVectorizer.text_from_html(str(self.driver.page_source))
+        # som3 w0rd5 w3re n0n3_5ense s0 this cle4n5 th4t up
         text = re.sub(r'([A-Za-z]*?(\d|\_)+[A-Za-z]*)+', '', text)
-        text = " ".join(w for w in nltk.wordpunct_tokenize(text) if w.lower() in self.real_words or not w.isalpha())
+        # bellow forces it to match words that in the nltk dicitonary (real words more or less)
+        #text = " ".join(w for w in nltk.wordpunct_tokenize(text) if w.lower() in self.real_words or not w.isalpha())
         return text
+
+    def get_spacy_doc(self):
+        lang_instance = spacy.load('en_core_web_sm')
+        return lang_instance(self.working_dictionary)
 
 
 def main():
@@ -110,7 +127,18 @@ def main():
     wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/843659/Service-Engineer-2'))
     wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/849210/SR-Data-Applied-Scientist'))
 
-    wpv.print_key_words()
+    wpv.print_freq_words()
+
+    # spacy is smart and knows some basic grammer and we can utilize that too!
+
+    lump = ""
+    for chunk in wpv.get_spacy_doc().noun_chunks:
+        lump = (lump + " " + str(chunk))
+
+    for entity in wpv.get_spacy_doc().ents:
+        lump = (lump + " " + str(entity))
+    
+    wpv.print_freq_words(text=lump)
 
 if __name__ == '__main__':
     main()
