@@ -1,0 +1,6 @@
+selenium
+spacy
+nltk-rake
+nltk
+bs4
+pandas
