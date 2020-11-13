@@ -5,6 +5,8 @@ import unicodedata
 import re
 import spacy
 import platform
+import time
+from rake_nltk import Rake
 from bs4 import BeautifulSoup
 from pathlib import Path
 from bs4.element import Comment
@@ -23,6 +25,8 @@ class WebPageVectorizer():
     real_words = None
     driver = None
     working_dictionary = ""
+    keyword_rake = Rake()
+
     """
     This is where we dump all of our words
     """
@@ -32,6 +36,8 @@ class WebPageVectorizer():
         nltk.download('stopwords')
         self.custom_stopwords = stopwords.words('english')
         self.real_words = set(nltk.corpus.words.words())
+        self.keyword_rake = Rake(stopwords=self.custom_stopwords)
+
         options = Options()
         options.headless = True
         operating_system = platform.system()
@@ -84,11 +90,29 @@ class WebPageVectorizer():
         visible_texts = filter(WebPageVectorizer.tag_visible, texts)  
         return u" ".join(t.strip() for t in visible_texts)
 
-    def print_freq_words(self, text=''):
+    def print_keywords(self, text='') -> list:
+        """
+        Using RAKE extract keywords into a list
+        This functino will print them as well as return them
+
+        returns a list
+        """
+        if not bool (text):
+            text = self.working_dictionary
+        self.keyword_rake.extract_keywords_from_text(text)
+        keywords = self.keyword_rake.get_ranked_phrases()
+        for word in keywords:
+            print(word)
+        return keywords
+
+
+    def print_freq_words(self, text='') -> list:
         """
         Will both print and return a list of words in order of frequency
 
         Set text to adjust with a param., default is all text
+
+        returns the list
         """
         if not bool (text):
             text = self.working_dictionary
@@ -101,13 +125,17 @@ class WebPageVectorizer():
         print(sorted_words)
         return list(sorted_words.index)
 
-    def strip_webpage(self, url: str) -> str:
+    def strip_webpage(self, url: str, wait=0) -> str:
         """
         This will strip a webpage for just words
+
+        url is the url
+        wait is the time to let the page load if needed
 
         returns a string
         """
         self.driver.get(url)
+        time.sleep(wait)
         text = WebPageVectorizer.text_from_html(str(self.driver.page_source))
         # som3 w0rd5 w3re n0n3_5ense s0 this cle4n5 th4t up
         text = re.sub(r'([A-Za-z]*?(\d|\_)+[A-Za-z]*)+', '', text)
@@ -123,9 +151,9 @@ class WebPageVectorizer():
 def main():
     wpv = WebPageVectorizer()
 
-    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/844144/EHS-Director-APAC'))
-    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/843659/Service-Engineer-2'))
-    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/849210/SR-Data-Applied-Scientist'))
+    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/844144/EHS-Director-APAC', wait=5))
+    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/843659/Service-Engineer-2', wait=5))
+    wpv.add_words(wpv.strip_webpage('https://careers.microsoft.com/us/en/job/849210/SR-Data-Applied-Scientist', wait=5))
 
     wpv.print_freq_words()
 
@@ -139,6 +167,9 @@ def main():
         lump = (lump + " " + str(entity))
     
     wpv.print_freq_words(text=lump)
+    
+    # last but not least and probably most important
+    wpv.print_keywords()
 
 if __name__ == '__main__':
     main()
