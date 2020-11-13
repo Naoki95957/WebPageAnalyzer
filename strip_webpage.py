@@ -4,6 +4,7 @@ import selenium
 import unicodedata
 import re
 import platform
+from pathlib import Path
 from selenium.webdriver.chrome.options import Options
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.corpus import stopwords
@@ -46,16 +47,20 @@ class WebPageVectorizer():
         options = Options()
         options.headless = True
         operating_system = platform.system()
-        chrome_driver = './drivers/mac_chromedriver86'
+
+        full_path = str(__file__)
+        full_path = str(Path(full_path).parents[0])
+
+        chrome_driver = '/drivers/mac_chromedriver86'
         if operating_system == "Linux":
-            chrome_driver = './drivers/linux_chromedriver86'
+            chrome_driver = '/drivers/linux_chromedriver86'
         elif operating_system == "Darwin":
-            chrome_driver = './drivers/mac_chromedriver86'
+            chrome_driver = '/drivers/mac_chromedriver86'
         elif operating_system == "Windows":
-            chrome_driver = './drivers/win_chromedriver86.exe'
+            chrome_driver = '/drivers/win_chromedriver86.exe'
         self.driver = selenium.webdriver.Chrome(
             options=options,
-            executable_path=chrome_driver)
+            executable_path=(full_path + chrome_driver))
 
     def __del__(self):
         self.driver.quit()
@@ -78,8 +83,8 @@ class WebPageVectorizer():
         matrix = vectorizer.fit_transform([self.working_dictionary])
         df = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names()).T
         sorted_words = df.sort_values(by=[0], ascending=False)
-        for word in sorted_words.index:
-            print(word) 
+        for i in range(0, len(sorted_words)):
+            print(sorted_words.index[i], "(uses:", str(sorted_words.iloc[i, 0]) + ")") 
         print(sorted_words)
         return list(sorted_words.index)
 
