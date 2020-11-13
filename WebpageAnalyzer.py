@@ -244,7 +244,7 @@ class WebpageANalyzer():
                 continue
             for word in unique_words:
                 if word in set_all_words:
-                    word_rank *= set_all_words[word]
+                    word_rank *= set_all_words[word] / len(unique_words)
             keyword_ranks.append(word_rank)
             keyword_words.append(keywords[i][1])
         keyword_freq_rank = zip(keyword_ranks, keyword_words)
@@ -258,7 +258,7 @@ class WebpageANalyzer():
         """
         keywords = self.get_analysis_for_keywords()
         for words in keywords:
-            print(words[1], "\trank:", words[0])
+            print(words[1], "\t(rank:", (str(words[0]) + ")"))
         return keywords
 
     def get_spacy_doc(self):
