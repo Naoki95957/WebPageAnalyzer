@@ -27,7 +27,7 @@ class WebpageANalyzer():
     custom_stopwords = []
     real_words = None
     driver = None
-    working_dictionary = ""
+    working_dictionary = []
     keyword_rake = Rake()
 
     """
@@ -63,7 +63,7 @@ class WebpageANalyzer():
         self.driver.quit()
     
     def add_words(self, text: str):
-        self.working_dictionary += str(" " + text)
+        self.working_dictionary.append(str(" " + text))
 
     @staticmethod
     def remove_accented_chars(text: str):
@@ -101,7 +101,9 @@ class WebpageANalyzer():
         returns a list
         """
         if not bool (text):
-            text = self.working_dictionary
+            text = ""
+            for doc in self.working_dictionary:
+                text += (" " + doc)
         self.keyword_rake.extract_keywords_from_text(text)
         return self.keyword_rake.get_ranked_phrases_with_scores()
 
@@ -113,7 +115,9 @@ class WebpageANalyzer():
         returns a list
         """
         if not bool (text):
-            text = self.working_dictionary
+            text = ""
+            for doc in self.working_dictionary:
+                text += (" " + doc)
         self.keyword_rake.extract_keywords_from_text(text)
         keywords = self.keyword_rake.get_ranked_phrases()
         for word in keywords:
@@ -129,7 +133,9 @@ class WebpageANalyzer():
         returns the list
         """
         if not bool (text):
-            text = self.working_dictionary
+            text = ""
+            for doc in self.working_dictionary:
+                text += (" " + doc)
         vectorizer = CountVectorizer(stop_words=self.custom_stopwords)
         matrix = vectorizer.fit_transform([text])
         df = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names()).T
@@ -148,7 +154,9 @@ class WebpageANalyzer():
         returns the list
         """
         if not bool (text):
-            text = self.working_dictionary
+            text = ""
+            for doc in self.working_dictionary:
+                text += (" " + doc)
         vectorizer = CountVectorizer(stop_words=self.custom_stopwords)
         matrix = vectorizer.fit_transform([text])
         df = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names()).T
@@ -228,9 +236,28 @@ class WebpageANalyzer():
             set_all_words[word] = set_all_words[word] + set_special_words[word]
 
         # last but not least and probably most important
-        keywords = self.get_keywords()
+        docs_keywords = []
+        for doc in self.working_dictionary:
+            docs_keywords.append(self.get_keywords(text=doc))
         keyword_ranks = []
         keyword_words = []
+
+        keywords = []
+        for doc_keyword_list in docs_keywords:
+            if not bool(keywords):
+                keywords.extend(doc_keyword_list)
+            else:
+                for i in range(0, len(doc_keyword_list)):
+                    keyword = doc_keyword_list[i]
+                    if keyword in keywords:
+                        for j in range(0, len(keywords)):
+                            word = keywords[j]
+                            if word[1] == keyword[1]:
+                                new_rank = word[0] * keyword[0]
+                                word = word[1]
+                                keywords[i] = (new_rank, word)
+                    else:
+                        keywords.append(keyword)
         for i in range(0, len(keywords)):
             word_rank = keywords[i][0]
             words = keywords[i][1].split(' ')
@@ -261,9 +288,15 @@ class WebpageANalyzer():
             print(words[1], "\t(rank:", (str(words[0]) + ")"))
         return keywords
 
-    def get_spacy_doc(self):
+    def get_spacy_doc(self, doc_number=-1):
         lang_instance = spacy.load('en_core_web_sm')
-        return lang_instance(self.working_dictionary)
+        if doc_number < 0:
+            text = ""
+            for doc in self.working_dictionary:
+                text += (" " + doc)
+            return lang_instance(text)
+        else:
+            return lang_instance(self.working_dictionary[doc_number])
 
 
 def main():
